@@ -3,9 +3,11 @@ module("serialize", { teardown: moduleTeardown });
 test("jQuery.param()", function() {
 	expect(22);
 
+	var params, settings;
+
 	equal( !( jQuery.ajaxSettings && jQuery.ajaxSettings.traditional ), true, "traditional flag, falsy by default" );
 
-	var params = {"foo":"bar", "baz":42, "quux":"All your base are belong to us"};
+	params = {"foo":"bar", "baz":42, "quux":"All your base are belong to us"};
 	equal( jQuery.param(params), "foo=bar&baz=42&quux=All+your+base+are+belong+to+us", "simple" );
 
 	params = {"string":"foo","null":null,"undefined":undefined};
@@ -37,7 +39,7 @@ test("jQuery.param()", function() {
 	// #7945
 	equal( jQuery.param({"jquery": "1.4.2"}), "jquery=1.4.2", "Check that object with a jQuery property get serialized correctly" );
 
-	var settings = { traditional: true };
+	settings = { traditional: true };
 
 	if ( jQuery.ajaxSettings ) {
 		jQuery.ajaxSetup( settings );
@@ -108,19 +110,20 @@ test("jQuery.param() Constructed prop values", function() {
 });
 
 test("serialize()", function() {
-	expect(5);
+	expect(6);
 
 	// Add html5 elements only for serialize because selector can't yet find them on non-html5 browsers
 	jQuery("#search").after(
-		"<input type='email' id='html5email' name='email' value='dave@jquery.com' />"+
-		"<input type='number' id='html5number' name='number' value='43' />"
+		"<input type='email' id='html5email' name='email' value='dave@jquery.com' />" +
+		"<input type='number' id='html5number' name='number' value='43' />" +
+		"<input type='file' name='fileupload' />"
 	);
 
 	equal( jQuery("#form").serialize(),
 		"action=Test&radio2=on&check=on&hidden=&foo%5Bbar%5D=&name=name&search=search&email=dave%40jquery.com&number=43&select1=&select2=3&select3=1&select3=2&select5=3",
 		"Check form serialization as query string");
 
-	equal( jQuery("#form :input").serialize(),
+	equal( jQuery("input,select,textarea,button", "#form").serialize(),
 		"action=Test&radio2=on&check=on&hidden=&foo%5Bbar%5D=&name=name&search=search&email=dave%40jquery.com&number=43&select1=&select2=3&select3=1&select3=2&select5=3",
 		"Check input serialization as query string");
 
@@ -128,7 +131,7 @@ test("serialize()", function() {
 		"T3=%3F%0D%0AZ&H1=x&H2=&PWD=&T1=&T2=YES&My+Name=me&S1=abc&S3=YES&S4=",
 		"Check form serialization as query string");
 
-	equal( jQuery("#testForm :input").serialize(),
+	equal( jQuery("input,select,textarea,button", "#testForm").serialize(),
 		"T3=%3F%0D%0AZ&H1=x&H2=&PWD=&T1=&T2=YES&My+Name=me&S1=abc&S3=YES&S4=",
 		"Check input serialization as query string");
 
@@ -136,10 +139,8 @@ test("serialize()", function() {
 		"action=Test&radio2=on&check=on&hidden=&foo%5Bbar%5D=&name=name&search=search&email=dave%40jquery.com&number=43&select1=&select2=3&select3=1&select3=2&select5=3&T3=%3F%0D%0AZ&H1=x&H2=&PWD=&T1=&T2=YES&My+Name=me&S1=abc&S3=YES&S4=",
 		"Multiple form serialization as query string");
 
-	/* Temporarily disabled. Opera 10 has problems with form serialization.
 	equal( jQuery("#form, #testForm :input").serialize(),
-		"action=Test&radio2=on&check=on&hidden=&foo%5Bbar%5D=&name=name&search=search&email=dave%40jquery.com&number=43&select1=&select2=3&select3=1&select3=2&T3=%3F%0D%0AZ&H1=x&H2=&PWD=&T1=&T2=YES&My+Name=me&S1=abc&S3=YES&S4=",
+		"action=Test&radio2=on&check=on&hidden=&foo%5Bbar%5D=&name=name&search=search&email=dave%40jquery.com&number=43&select1=&select2=3&select3=1&select3=2&select5=3&T3=%3F%0D%0AZ&H1=x&H2=&PWD=&T1=&T2=YES&My+Name=me&S1=abc&S3=YES&S4=",
 		"Mixed form/input serialization as query string");
-	*/
 	jQuery("#html5email, #html5number").remove();
 });

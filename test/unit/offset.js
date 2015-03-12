@@ -1,6 +1,38 @@
-if ( jQuery.fn.offset ) {
+(function() {
 
-module("offset", { teardown: moduleTeardown });
+if ( !jQuery.fn.offset ) {
+	return;
+}
+
+var supportsScroll, supportsFixedPosition,
+	forceScroll = jQuery("<div/>").css({ width: 2000, height: 2000 }),
+	checkSupport = function() {
+		// Only run once
+		checkSupport = false;
+
+		var checkFixed = jQuery("<div/>").css({ position: "fixed", top: "20px" }).appendTo("#qunit-fixture");
+
+		// Must append to body because #qunit-fixture is hidden and elements inside it don't have a scrollTop
+		forceScroll.appendTo("body");
+		window.scrollTo( 200, 200 );
+		supportsScroll = document.documentElement.scrollTop || document.body.scrollTop;
+		forceScroll.detach();
+
+		supportsFixedPosition = checkFixed[0].offsetTop === 20;
+		checkFixed.remove();
+	};
+
+module("offset", { setup: function(){
+	if ( typeof checkSupport === "function" ) {
+		checkSupport();
+	}
+
+	// Force a scroll value on the main window to ensure incorrect results
+	// if offset is using the scroll offset of the parent window
+	forceScroll.appendTo("body");
+	window.scrollTo( 1, 1 );
+	forceScroll.detach();
+}, teardown: moduleTeardown });
 
 /*
 	Closure-compiler will roll static methods off of the jQuery object and so they will
@@ -15,6 +47,15 @@ test("empty set", function() {
 	strictEqual( jQuery().position(), undefined, "position() returns undefined for empty set (#11962)" );
 });
 
+test("object without getBoundingClientRect", function() {
+	expect(2);
+
+	// Simulates a browser without gBCR on elements, we just want to return 0,0
+	var result = jQuery({ ownerDocument: document }).offset();
+	equal( result.top, 0, "Check top" );
+	equal( result.left, 0, "Check left" );
+});
+
 test("disconnected node", function() {
 	expect(2);
 
@@ -24,28 +65,11 @@ test("disconnected node", function() {
 	equal( result.left, 0, "Check left" );
 });
 
-var supportsScroll = false;
-
 testIframe("offset/absolute", "absolute", function($, iframe) {
 	expect(4);
 
 	var doc = iframe.document,
-			tests, forceScroll;
-
-	// force a scroll value on the main window
-	// this insures that the results will be wrong
-	// if the offset method is using the scroll offset
-	// of the parent window
-	forceScroll = jQuery("<div>").css({ "width": 2000, "height": 2000 });
-	forceScroll.appendTo("body");
-
-	window.scrollTo(200, 200);
-
-	if ( document.documentElement.scrollTop || document.body.scrollTop ) {
-		supportsScroll = true;
-	}
-
-	window.scrollTo(1, 1);
+			tests;
 
 	// get offset
 	tests = [
@@ -65,15 +89,15 @@ testIframe("offset/absolute", "absolute", function($, iframe) {
 		equal( jQuery( this["id"], doc ).position().top,  this["top"],  "jQuery('" + this["id"] + "').position().top" );
 		equal( jQuery( this["id"], doc ).position().left, this["left"], "jQuery('" + this["id"] + "').position().left" );
 	});
-
-	forceScroll.remove();
 });
 
 testIframe("offset/absolute", "absolute", function( $ ) {
 	expect(178);
 
+	var tests, offset;
+
 	// get offset tests
-	var tests = [
+	tests = [
 		{ "id": "#absolute-1",     "top":  1, "left":  1 },
 		{ "id": "#absolute-1-1",   "top":  5, "left":  5 },
 		{ "id": "#absolute-1-1-1", "top":  9, "left":  9 },
@@ -98,7 +122,7 @@ testIframe("offset/absolute", "absolute", function( $ ) {
 	});
 
 	// test #5781
-	var offset = $( "#positionTest" ).offset({ "top": 10, "left": 10 }).offset();
+	offset = $( "#positionTest" ).offset({ "top": 10, "left": 10 }).offset();
 	equal( offset.top,  10, "Setting offset on element with position absolute but 'auto' values." );
 	equal( offset.left, 10, "Setting offset on element with position absolute but 'auto' values." );
 
@@ -157,14 +181,11 @@ testIframe("offset/absolute", "absolute", function( $ ) {
 testIframe("offset/relative", "relative", function( $ ) {
 	expect(60);
 
-	// IE is collapsing the top margin of 1px; detect and adjust accordingly
-	var ie = $("#relative-1").offset().top === 6;
-
 	// get offset
 	var tests = [
-		{ "id": "#relative-1",   "top": ie ?   6 :   7, "left":  7 },
-		{ "id": "#relative-1-1", "top": ie ?  13 :  15, "left": 15 },
-		{ "id": "#relative-2",   "top": ie ? 141 : 142, "left": 27 }
+		{ "id": "#relative-1",   "top":   7, "left":  7 },
+		{ "id": "#relative-1-1", "top":  15, "left": 15 },
+		{ "id": "#relative-2",   "top": 142, "left": 27 }
 	];
 	jQuery.each( tests, function() {
 		equal( $( this["id"] ).offset().top,  this["top"],  "jQuery('" + this["id"] + "').offset().top" );
@@ -174,9 +195,9 @@ testIframe("offset/relative", "relative", function( $ ) {
 
 	// get position
 	tests = [
-		{ "id": "#relative-1",   "top": ie ?   5 :   6, "left":  6 },
-		{ "id": "#relative-1-1", "top": ie ?   4 :   5, "left":  5 },
-		{ "id": "#relative-2",   "top": ie ? 140 : 141, "left": 26 }
+		{ "id": "#relative-1",   "top":   6, "left":  6 },
+		{ "id": "#relative-1-1", "top":   5, "left":  5 },
+		{ "id": "#relative-2",   "top": 141, "left": 26 }
 	];
 	jQuery.each( tests, function() {
 		equal( $( this["id"] ).position().top,  this["top"],  "jQuery('" + this["id"] + "').position().top" );
@@ -216,18 +237,14 @@ testIframe("offset/relative", "relative", function( $ ) {
 });
 
 testIframe("offset/static", "static", function( $ ) {
-
-	// IE is collapsing the top margin of 1px; detect and adjust accordingly
-	var ie = $("#static-1").offset().top === 6;
-
 	expect( 80 );
 
 	// get offset
 	var tests = [
-		{ "id": "#static-1",     "top": ie ?   6 :   7, "left":  7 },
-		{ "id": "#static-1-1",   "top": ie ?  13 :  15, "left": 15 },
-		{ "id": "#static-1-1-1", "top": ie ?  20 :  23, "left": 23 },
-		{ "id": "#static-2", "top": ie ? 121 : 122, left: 7 }
+		{ "id": "#static-1",     "top":   7, "left":  7 },
+		{ "id": "#static-1-1",   "top":  15, "left": 15 },
+		{ "id": "#static-1-1-1", "top":  23, "left": 23 },
+		{ "id": "#static-2",     "top": 122, left: 7 }
 	];
 	jQuery.each( tests, function() {
 		equal( $( this["id"] ).offset().top,  this["top"],  "jQuery('" + this["id"] + "').offset().top" );
@@ -237,10 +254,10 @@ testIframe("offset/static", "static", function( $ ) {
 
 	// get position
 	tests = [
-		{ "id": "#static-1",     "top": ie ?   5 :   6, "left":  6 },
-		{ "id": "#static-1-1",   "top": ie ?  12 :  14, "left": 14 },
-		{ "id": "#static-1-1-1", "top": ie ?  19 :  22, "left": 22 },
-		{ "id": "#static-2", "top": ie ? 120 : 121, "left": 6 }
+		{ "id": "#static-1",     "top":   6, "left":  6 },
+		{ "id": "#static-1-1",   "top":  14, "left": 14 },
+		{ "id": "#static-1-1-1", "top":  22, "left": 22 },
+		{ "id": "#static-2",     "top": 121, "left": 6 }
 	];
 	jQuery.each( tests, function() {
 		equal( $( this["id"] ).position().top,  this["top"],  "jQuery('" + this["top"]  + "').position().top" );
@@ -284,23 +301,43 @@ testIframe("offset/static", "static", function( $ ) {
 });
 
 testIframe("offset/fixed", "fixed", function( $ ) {
-	expect(30);
+	expect(34);
 
-	var tests = [
-		{ "id": "#fixed-1", "top": 1001, "left": 1001 },
-		{ "id": "#fixed-2", "top": 1021, "left": 1021 }
+	var tests, $noTopLeft;
+
+	tests = [
+		{
+			"id": "#fixed-1",
+			"offsetTop": 1001,
+			"offsetLeft": 1001,
+			"positionTop": 0,
+			"positionLeft": 0
+		},
+		{
+			"id": "#fixed-2",
+			"offsetTop": 1021,
+			"offsetLeft": 1021,
+			"positionTop": 20,
+			"positionLeft": 20
+		}
 	];
 
 	jQuery.each( tests, function() {
-		if ( !supportsScroll ) {
+		if ( !window.supportsScroll ) {
+			ok( true, "Browser doesn't support scroll position." );
+			ok( true, "Browser doesn't support scroll position." );
 			ok( true, "Browser doesn't support scroll position." );
 			ok( true, "Browser doesn't support scroll position." );
 
-		} else if ( jQuery.offset.supportsFixedPosition ) {
-			equal( $( this["id"] ).offset().top,  this["top"],  "jQuery('" + this["id"] + "').offset().top" );
-			equal( $( this["id"] ).offset().left, this["left"], "jQuery('" + this["id"] + "').offset().left" );
+		} else if ( window.supportsFixedPosition ) {
+			equal( $( this["id"] ).offset().top,  this["offsetTop"],  "jQuery('" + this["id"] + "').offset().top" );
+			equal( $( this["id"] ).position().top,  this["positionTop"],  "jQuery('" + this["id"] + "').position().top" );
+			equal( $( this["id"] ).offset().left, this["offsetLeft"], "jQuery('" + this["id"] + "').offset().left" );
+			equal( $( this["id"] ).position().left,  this["positionLeft"],  "jQuery('" + this["id"] + "').position().left" );
 		} else {
 			// need to have same number of assertions
+			ok( true, "Fixed position is not supported" );
+			ok( true, "Fixed position is not supported" );
 			ok( true, "Fixed position is not supported" );
 			ok( true, "Fixed position is not supported" );
 		}
@@ -316,7 +353,7 @@ testIframe("offset/fixed", "fixed", function( $ ) {
 	];
 
 	jQuery.each( tests, function() {
-		if ( jQuery.offset.supportsFixedPosition ) {
+		if ( window.supportsFixedPosition ) {
 			$( this["id"] ).offset({ "top": this["top"], "left": this["left"] });
 			equal( $( this["id"] ).offset().top,  this["top"],  "jQuery('" + this["id"] + "').offset({ top: "  + this["top"]  + " })" );
 			equal( $( this["id"] ).offset().left, this["left"], "jQuery('" + this["id"] + "').offset({ left: " + this["left"] + " })" );
@@ -339,8 +376,8 @@ testIframe("offset/fixed", "fixed", function( $ ) {
 	});
 
 	// Bug 8316
-	var $noTopLeft = $("#fixed-no-top-left");
-	if ( jQuery.offset.supportsFixedPosition ) {
+	$noTopLeft = $("#fixed-no-top-left");
+	if ( window.supportsFixedPosition ) {
 		equal( $noTopLeft.offset().top,  1007,  "Check offset top for fixed element with no top set" );
 		equal( $noTopLeft.offset().left, 1007, "Check offset left for fixed element with no left set" );
 	} else {
@@ -363,17 +400,11 @@ testIframe("offset/table", "table", function( $ ) {
 testIframe("offset/scroll", "scroll", function( $, win ) {
 	expect(24);
 
-	// IE is collapsing the top margin of 1px; detect and adjust accordingly
-	var ie = $("#scroll-1").offset().top == 6;
-
-	// IE is collapsing the top margin of 1px
-	equal( $("#scroll-1").offset().top, ie ? 6 : 7, "jQuery('#scroll-1').offset().top" );
+	equal( $("#scroll-1").offset().top, 7, "jQuery('#scroll-1').offset().top" );
 	equal( $("#scroll-1").offset().left, 7, "jQuery('#scroll-1').offset().left" );
 
-	// IE is collapsing the top margin of 1px
-	equal( $("#scroll-1-1").offset().top, ie ? 9 : 11, "jQuery('#scroll-1-1').offset().top" );
+	equal( $("#scroll-1-1").offset().top, 11, "jQuery('#scroll-1-1').offset().top" );
 	equal( $("#scroll-1-1").offset().left, 11, "jQuery('#scroll-1-1').offset().left" );
-
 
 	// scroll offset tests .scrollTop/Left
 	equal( $("#scroll-1").scrollTop(), 5, "jQuery('#scroll-1').scrollTop()" );
@@ -388,7 +419,7 @@ testIframe("offset/scroll", "scroll", function( $, win ) {
 
 	win.name = "test";
 
-	if ( !supportsScroll ) {
+	if ( !window.supportsScroll ) {
 		ok( true, "Browser doesn't support scroll position." );
 		ok( true, "Browser doesn't support scroll position." );
 
@@ -420,34 +451,38 @@ testIframe("offset/scroll", "scroll", function( $, win ) {
 });
 
 testIframe("offset/body", "body", function( $ ) {
-	expect(2);
+	expect(4);
 
 	equal( $("body").offset().top, 1, "jQuery('#body').offset().top" );
 	equal( $("body").offset().left, 1, "jQuery('#body').offset().left" );
+	equal( $("#firstElement").position().left, 5, "$('#firstElement').position().left" );
+	equal( $("#firstElement").position().top, 5, "$('#firstElement').position().top" );
 });
 
 test("chaining", function() {
 	expect(3);
 	var coords = { "top":  1, "left":  1 };
-	equal( jQuery("#absolute-1").offset(coords).selector, "#absolute-1", "offset(coords) returns jQuery object" );
-	equal( jQuery("#non-existent").offset(coords).selector, "#non-existent", "offset(coords) with empty jQuery set returns jQuery object" );
-	equal( jQuery("#absolute-1").offset(undefined).selector, "#absolute-1", "offset(undefined) returns jQuery object (#5571)" );
+	equal( jQuery("#absolute-1").offset(coords).jquery, jQuery.fn.jquery, "offset(coords) returns jQuery object" );
+	equal( jQuery("#non-existent").offset(coords).jquery, jQuery.fn.jquery, "offset(coords) with empty jQuery set returns jQuery object" );
+	equal( jQuery("#absolute-1").offset(undefined).jquery, jQuery.fn.jquery, "offset(undefined) returns jQuery object (#5571)" );
 });
 
 test("offsetParent", function(){
-	expect(12);
+	expect(13);
 
-	var body = jQuery("body").offsetParent();
+	var body, header, div, area;
+
+	body = jQuery("body").offsetParent();
 	equal( body.length, 1, "Only one offsetParent found." );
-	equal( body[0], document.body, "The body is its own offsetParent." );
+	equal( body[0], document.documentElement, "The html element is the offsetParent of the body." );
 
-	var header = jQuery("#qunit-header").offsetParent();
+	header = jQuery("#qunit").offsetParent();
 	equal( header.length, 1, "Only one offsetParent found." );
-	equal( header[0], document.body, "The body is the offsetParent." );
+	equal( header[0], document.documentElement, "The html element is the offsetParent of #qunit." );
 
-	var div = jQuery("#nothiddendivchild").offsetParent();
+	div = jQuery("#nothiddendivchild").offsetParent();
 	equal( div.length, 1, "Only one offsetParent found." );
-	equal( div[0], document.body, "The body is the offsetParent." );
+	equal( div[0], document.getElementById("qunit-fixture"), "The #qunit-fixture is the offsetParent of #nothiddendivchild." );
 
 	jQuery("#nothiddendiv").css("position", "relative");
 
@@ -457,32 +492,38 @@ test("offsetParent", function(){
 
 	div = jQuery("body, #nothiddendivchild").offsetParent();
 	equal( div.length, 2, "Two offsetParent found." );
-	equal( div[0], document.body, "The body is the offsetParent." );
+	equal( div[0], document.documentElement, "The html element is the offsetParent of the body." );
 	equal( div[1], jQuery("#nothiddendiv")[0], "The div is the offsetParent." );
 
-	var area = jQuery("#imgmap area").offsetParent();
-	equal( area[0], document.body, "The body is the offsetParent." );
+	area = jQuery("#imgmap area").offsetParent();
+	equal( area[0], document.documentElement, "The html element is the offsetParent of the body." );
+
+	div = jQuery("<div>").css({ "position": "absolute" }).appendTo("body");
+	equal( div.offsetParent()[0], document.documentElement, "Absolutely positioned div returns html as offset parent, see #12139" );
+
+	div.remove();
 });
 
 test("fractions (see #7730 and #7885)", function() {
 	expect(2);
 
-	jQuery('body').append('<div id="fractions"/>');
+	jQuery("body").append("<div id='fractions'/>");
 
-	var expected = { "top": 1000, "left": 1000 };
-	var div = jQuery('#fractions');
+	var result,
+		expected = { "top": 1000, "left": 1000 },
+		div = jQuery("#fractions");
 
 	div.css({
-		"position": 'absolute',
-		"left": '1000.7432222px',
-		"top": '1000.532325px',
+		"position": "absolute",
+		"left": "1000.7432222px",
+		"top": "1000.532325px",
 		"width": 100,
 		"height": 100
 	});
 
 	div.offset(expected);
 
-	var result = div.offset();
+	result = div.offset();
 
 	equal( result.top, expected.top, "Check top" );
 	equal( result.left, expected.left, "Check left" );
@@ -490,4 +531,31 @@ test("fractions (see #7730 and #7885)", function() {
 	div.remove();
 });
 
-}
+test("iframe scrollTop/Left (see gh-1945)", function() {
+	expect( 2 );
+
+	var ifDoc = jQuery( "#iframe" )[ 0 ].contentDocument;
+
+	// Mobile Safari and Android 2.3 resize the iframe by its content
+	// meaning it's not possible to scroll the iframe only its parent element.
+	// It seems (not confirmed) in android 4.0 it's not possible to scroll iframes from the code.
+	if ( /iphone os/i.test( navigator.userAgent ) ||
+	    /android 2\.3/i.test( navigator.userAgent ) ||
+	    /android 4\.0/i.test( navigator.userAgent ) ) {
+		equal( true, true, "Can't scroll iframes in this environment" );
+		equal( true, true, "Can't scroll iframes in this environment" );
+
+	} else {
+		// Tests scrollTop/Left with iframes
+		jQuery( "#iframe" ).css( "width", "50px" ).css( "height", "50px" );
+		ifDoc.write( "<div style='width: 1000px; height: 1000px;'></div>" );
+
+		jQuery( ifDoc ).scrollTop( 200 );
+		jQuery( ifDoc ).scrollLeft( 500 );
+
+		equal( jQuery( ifDoc ).scrollTop(), 200, "$($('#iframe')[0].contentDocument).scrollTop()" );
+		equal( jQuery( ifDoc ).scrollLeft(), 500, "$($('#iframe')[0].contentDocument).scrollLeft()" );
+	}
+});
+
+})();

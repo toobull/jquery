@@ -17,12 +17,12 @@
 </head>
 <body>
 	<div>
-		<script src="../../../dist/jquery.js"></script>
+		<script src="../../jquery.js"></script>
+		<script src="getComputedSupport.js"></script>
 	</div>
 	<script>
-		jQuery(function() {
-			window.parent.iframeCallback( jQuery( "body" ).css( "backgroundColor" ), jQuery.support );
-		});
+		window.parent.iframeCallback( jQuery( "body" ).css( "backgroundColor" ),
+				getComputedSupport( jQuery.support ) );
 	</script>
 </body>
 </html>
